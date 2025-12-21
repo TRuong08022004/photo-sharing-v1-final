@@ -1,0 +1,24 @@
+.login-register-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  min-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.login-section,
+.register-section {
+  padding: 40px;
+  margin-bottom: 30px;
+  border-radius: 8px;
+  background-color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+@media (min-width: 768px) {
+  .login-register-container {
+    padding: 60px 40px;
+  }
+}
