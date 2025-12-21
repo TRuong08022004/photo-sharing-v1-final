@@ -107,7 +107,7 @@ function TopBar({ user, onLogout, onPhotoUploaded }) {
     <AppBar className="topbar-appBar" position="absolute">
       <Toolbar style={{ display: "flex", justifyContent: "space-between" }}>
         <Typography variant="h5" color="inherit">
-          B22DCAT128
+          B22DCAT308_TRANBATRUONG
         </Typography>
         <Typography variant="h5" color="inherit">
           {contextMessage}
