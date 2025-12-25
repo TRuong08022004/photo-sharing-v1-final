@@ -59,7 +59,7 @@ router.get("/user/:id", requireAuth, async (request, response) => {
     }
 
     const photos = await Photo.find({ user_id: userId })
-      .select("_id user_id comments file_name date_time")
+      .select("_id user_id comments file_name date_time likes")
       .exec();
 
     const processedPhotos = await Promise.all(
@@ -82,6 +82,11 @@ router.get("/user/:id", requireAuth, async (request, response) => {
             })
           );
         }
+
+        photoObj.like_count = (photo.likes || []).length;
+        photoObj.is_liked = (photo.likes || []).some(
+          (likerId) => likerId.toString() === request.user_id
+        );
 
         return photoObj;
       })
@@ -227,6 +232,40 @@ router.delete(
   }
 );
 
+// POST /photo/:photo_id/like - Toggle like on a photo
+router.post("/:photo_id/like", requireAuth, async (request, response) => {
+  const { photo_id } = request.params;
+
+  try {
+    const photo = await Photo.findById(photo_id).select("likes").exec();
+    if (!photo) {
+      return response.status(400).json({ error: "Photo not found" });
+    }
+
+    const likedAlready = (photo.likes || []).some(
+      (likerId) => likerId.toString() === request.user_id
+    );
+
+    if (likedAlready) {
+      photo.likes = photo.likes.filter(
+        (likerId) => likerId.toString() !== request.user_id
+      );
+    } else {
+      photo.likes.push(request.user_id);
+    }
+
+    await photo.save();
+
+    return response.status(200).json({
+      like_count: (photo.likes || []).length,
+      is_liked: !likedAlready,
+    });
+  } catch (error) {
+    console.error("Error toggling like:", error);
+    response.status(500).json({ error: "Error toggling like" });
+  }
+});
+
 router.delete("/:photo_id", requireAuth, async (request, response) => {
   const { photo_id } = request.params;
 
@@ -347,6 +386,10 @@ router.get("/comments/search", requireAuth, async (request, response) => {
               file_name: photo.file_name,
               user_id: photo.user_id,
               owner: userMap.get(photo.user_id?.toString()) || null,
+              like_count: (photo.likes || []).length,
+              is_liked: (photo.likes || []).some(
+                (likerId) => likerId.toString() === request.user_id
+              ),
             },
           });
         }
@@ -412,6 +455,10 @@ router.get("/search", requireAuth, async (request, response) => {
         ...photo,
         user: owner || null,
         comments,
+        like_count: (photo.likes || []).length,
+        is_liked: (photo.likes || []).some(
+          (likerId) => likerId.toString() === request.user_id
+        ),
       };
     });
 

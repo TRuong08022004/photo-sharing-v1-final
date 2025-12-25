@@ -19,6 +19,7 @@ import {
 import { useParams, Link } from "react-router-dom";
 import fetchModel from "../../lib/fetchModelData";
 import { apiUrl, serverUrl } from "../../config.api";
+import { ENABLE_LIKE_FEATURE } from "../../config.features";
 
 import "./styles.css";
 
@@ -208,6 +209,34 @@ function UserPhotos({ photoUploadTrigger }) {
     }
   };
 
+  const handleToggleLike = async (photoId) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(apiUrl(`/photo/${photoId}/like`), {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.status === 200) {
+        const data = await response.json();
+        setPhotos((prev) =>
+          prev.map((photo) =>
+            photo._id === photoId
+              ? { ...photo, like_count: data.like_count, is_liked: data.is_liked }
+              : photo
+          )
+        );
+      } else {
+        alert("Failed to update like");
+      }
+    } catch (error) {
+      console.error("Error toggling like:", error);
+      alert("Failed to update like");
+    }
+  };
+
   return (
     <div>
       {photos.map((photo) => (
@@ -220,25 +249,37 @@ function UserPhotos({ photoUploadTrigger }) {
             style={{ cursor: "pointer" }}
             onClick={() => setViewingPhoto(photo)}
           />
-          <CardContent>
-            <Box
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-            >
+        <CardContent>
+          <Box
+            display="flex"
+            justifyContent="space-between"
+            alignItems="center"
+          >
+            <Box display="flex" alignItems="center" gap={2}>
               <Typography variant="caption" display="block" gutterBottom>
                 Posted on: {new Date(photo.date_time).toLocaleString()}
               </Typography>
-              {photo.user_id === currentUserId && (
+              {ENABLE_LIKE_FEATURE && (
                 <Button
-                  color="error"
+                  variant={photo.is_liked ? "contained" : "outlined"}
+                  color={photo.is_liked ? "error" : "primary"}
                   size="small"
-                  onClick={() => handleDeletePhoto(photo._id)}
+                  onClick={() => handleToggleLike(photo._id)}
                 >
-                  Delete Photo
+                  Like {photo.like_count || 0}
                 </Button>
               )}
-        </Box>
+            </Box>
+            {photo.user_id === currentUserId && (
+              <Button
+                color="error"
+                size="small"
+                onClick={() => handleDeletePhoto(photo._id)}
+              >
+                Delete Photo
+              </Button>
+            )}
+          </Box>
 
         <Typography variant="h6">Comments:</Typography>
         <TextField
