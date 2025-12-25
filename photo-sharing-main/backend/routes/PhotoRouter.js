@@ -276,4 +276,150 @@ router.get("/commentsOf/:userId", requireAuth, async (request, response) => {
   }
 });
 
+// GET /photo/comments/search?q=... - Search comments by text or commenter name/login
+router.get("/comments/search", requireAuth, async (request, response) => {
+  const searchTerm = (request.query.q || "").trim();
+
+  if (!searchTerm) {
+    return response.status(200).json([]);
+  }
+
+  try {
+    const matchRegex = new RegExp(searchTerm, "i");
+
+    // Find users whose names/login match; helps search by commenter identity.
+    const matchingUsers = await User.find({
+      $or: [
+        { first_name: matchRegex },
+        { last_name: matchRegex },
+        { login_name: matchRegex },
+        { occupation: matchRegex },
+        { location: matchRegex },
+      ],
+    })
+      .select("_id first_name last_name")
+      .lean();
+
+    const matchingUserIds = matchingUsers.map((u) => u._id);
+
+    // Find photos that contain comments matching text or from matching users.
+    const photosWithMatches = await Photo.find({
+      comments: {
+        $elemMatch: {
+          $or: [{ comment: matchRegex }, { user_id: { $in: matchingUserIds } }],
+        },
+      },
+    }).lean();
+
+    // Collect all user ids needed (commenters + photo owners + matched users)
+    const userIdsNeeded = new Set(matchingUserIds.map((id) => id.toString()));
+    photosWithMatches.forEach((photo) => {
+      if (photo.user_id) userIdsNeeded.add(photo.user_id.toString());
+      (photo.comments || []).forEach((comment) => {
+        if (comment.user_id) userIdsNeeded.add(comment.user_id.toString());
+      });
+    });
+
+    const users = await User.find({ _id: { $in: Array.from(userIdsNeeded) } })
+      .select("_id first_name last_name")
+      .lean();
+    const userMap = new Map(
+      users.map((user) => [user._id.toString(), user])
+    );
+
+    const results = [];
+    photosWithMatches.forEach((photo) => {
+      (photo.comments || []).forEach((comment) => {
+        const commenterId = comment.user_id ? comment.user_id.toString() : "";
+        const matchesText = matchRegex.test(comment.comment || "");
+        const matchesUser = matchingUserIds.some(
+          (id) => id.toString() === commenterId
+        );
+
+        if (matchesText || matchesUser) {
+          results.push({
+            _id: comment._id,
+            comment: comment.comment,
+            date_time: comment.date_time,
+            user: userMap.get(commenterId) || null,
+            photo: {
+              _id: photo._id,
+              file_name: photo.file_name,
+              user_id: photo.user_id,
+              owner: userMap.get(photo.user_id?.toString()) || null,
+            },
+          });
+        }
+      });
+    });
+
+    response.status(200).json(results);
+  } catch (error) {
+    console.error("Error searching comments:", error);
+    response.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /photo/search?q=... - Search photos by file name, poster name, or comment text
+router.get("/search", requireAuth, async (request, response) => {
+  const searchTerm = (request.query.q || "").trim();
+
+  if (!searchTerm) {
+    return response.status(200).json([]);
+  }
+
+  try {
+    const matchRegex = new RegExp(searchTerm, "i");
+
+    // Find users whose names/login match to widen search to their photos
+    const matchingUsers = await User.find({
+      $or: [
+        { first_name: matchRegex },
+        { last_name: matchRegex },
+        { login_name: matchRegex },
+        { occupation: matchRegex },
+        { location: matchRegex },
+      ],
+    })
+      .select("_id first_name last_name")
+      .lean();
+
+    const matchingUserIds = matchingUsers.map((u) => u._id);
+
+    const photos = await Photo.find({
+      $or: [
+        { file_name: matchRegex },
+        { user_id: { $in: matchingUserIds } },
+        { "comments.comment": matchRegex },
+      ],
+    })
+      .sort({ date_time: -1 })
+      .lean();
+
+    const userMap = new Map();
+    [...matchingUsers, ...(await User.find({}).select("_id first_name last_name").lean())].forEach(
+      (user) => userMap.set(user._id.toString(), user)
+    );
+
+    const enrichedPhotos = photos.map((photo) => {
+      const owner = userMap.get(photo.user_id?.toString());
+      const comments = (photo.comments || []).map((comment) => ({
+        ...comment,
+        user: userMap.get(comment.user_id?.toString()) || null,
+      }));
+
+      return {
+        ...photo,
+        user: owner || null,
+        comments,
+      };
+    });
+
+    response.status(200).json(enrichedPhotos);
+  } catch (error) {
+    console.error("Error searching photos:", error);
+    response.status(500).json({ error: "Internal server error" });
+  }
+});
+
 module.exports = router;

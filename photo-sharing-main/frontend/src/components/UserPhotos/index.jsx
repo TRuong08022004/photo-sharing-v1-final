@@ -30,6 +30,7 @@ function UserPhotos({ photoUploadTrigger }) {
   const [editCommentText, setEditCommentText] = useState("");
   const [currentUserId, setCurrentUserId] = useState(null);
   const [viewingPhoto, setViewingPhoto] = useState(null);
+  const [commentFilters, setCommentFilters] = useState({});
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -53,6 +54,13 @@ function UserPhotos({ photoUploadTrigger }) {
       ...commentTexts,
       [photoId]: text,
     });
+  };
+
+  const handleCommentFilterChange = (photoId, text) => {
+    setCommentFilters((prev) => ({
+      ...prev,
+      [photoId]: text,
+    }));
   };
 
   const handleCommentSubmit = async (photoId) => {
@@ -117,6 +125,21 @@ function UserPhotos({ photoUploadTrigger }) {
       console.error("Error deleting comment:", error);
       alert("Failed to delete comment");
     }
+  };
+
+  const getFilteredComments = (photo) => {
+    const term = (commentFilters[photo._id] || "").trim().toLowerCase();
+    if (!term) return photo.comments || [];
+
+    return (photo.comments || []).filter((comment) => {
+      const textMatch = (comment.comment || "").toLowerCase().includes(term);
+      const nameMatch = `${comment.user?.first_name || ""} ${
+        comment.user?.last_name || ""
+      }`
+        .toLowerCase()
+        .includes(term);
+      return textMatch || nameMatch;
+    });
   };
 
   const handleEditComment = (comment) => {
@@ -215,16 +238,25 @@ function UserPhotos({ photoUploadTrigger }) {
                   Delete Photo
                 </Button>
               )}
-            </Box>
+        </Box>
 
-            <Typography variant="h6">Comments:</Typography>
-            <List dense>
-              {photo.comments?.map((comment) => (
-                <React.Fragment key={comment._id}>
-                  <ListItem alignItems="flex-start">
-                    <ListItemText
-                      primary={comment.comment}
-                      secondary={
+        <Typography variant="h6">Comments:</Typography>
+        <TextField
+          fullWidth
+          size="small"
+          variant="outlined"
+          placeholder="Search comments in this post..."
+          value={commentFilters[photo._id] || ""}
+          onChange={(e) => handleCommentFilterChange(photo._id, e.target.value)}
+          sx={{ mb: 1 }}
+        />
+        <List dense>
+          {getFilteredComments(photo).map((comment) => (
+            <React.Fragment key={comment._id}>
+              <ListItem alignItems="flex-start">
+                <ListItemText
+                  primary={comment.comment}
+                  secondary={
                         <>
                           <Typography
                             component={Link}

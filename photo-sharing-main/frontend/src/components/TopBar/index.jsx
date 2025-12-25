@@ -1,5 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { AppBar, Toolbar, Typography, Button, Box, Input } from "@mui/material";
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  Button,
+  Box,
+  Input,
+  TextField,
+} from "@mui/material";
 import { useLocation, useNavigate } from "react-router-dom";
 import fetchModel from "../../lib/fetchModelData";
 import { apiUrl } from "../../config.api";
@@ -15,6 +23,7 @@ function TopBar({ user, onLogout, onPhotoUploaded }) {
   const pathname = location.pathname;
   const [contextMessage, setContextMessage] = useState("Photo Sharing");
   const [uploadError, setUploadError] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -103,6 +112,13 @@ function TopBar({ user, onLogout, onPhotoUploaded }) {
     event.target.value = "";
   };
 
+  const handleSearchChange = (event) => {
+    const term = event.target.value;
+    setSearchTerm(term);
+    const trimmed = term.trim();
+    navigate(trimmed ? `/search?query=${encodeURIComponent(trimmed)}` : "/search");
+  };
+
   return (
     <AppBar className="topbar-appBar" position="absolute">
       <Toolbar style={{ display: "flex", justifyContent: "space-between" }}>
@@ -115,9 +131,15 @@ function TopBar({ user, onLogout, onPhotoUploaded }) {
         <Box>
           {user ? (
             <Box display="flex" alignItems="center" gap={2}>
-              <Typography variant="body1" color="inherit">
-                Hi {user.first_name}
-              </Typography>
+              <TextField
+                size="small"
+                variant="outlined"
+                placeholder="Search users..."
+                value={searchTerm}
+                onChange={handleSearchChange}
+                inputProps={{ "aria-label": "search" }}
+                sx={{ backgroundColor: "white", borderRadius: 1, minWidth: 220 }}
+              />
               <label htmlFor="photo-upload">
                 <Input
                   id="photo-upload"

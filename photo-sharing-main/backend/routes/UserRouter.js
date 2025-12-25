@@ -64,6 +64,67 @@ router.get("/list", requireAuth, async (request, response) => {
   }
 });
 
+// GET /user/search?q=... - Search users by name/login and include stats
+router.get("/search", requireAuth, async (request, response) => {
+  const searchTerm = (request.query.q || "").trim();
+
+  if (!searchTerm) {
+    // Empty query returns an empty array to keep UI predictable
+    return response.status(200).json([]);
+  }
+
+  try {
+    const Photo = require("../db/photoModel");
+    const matchRegex = new RegExp(searchTerm, "i");
+
+    // Find matching users
+    const matchedUsers = await User.find({
+      $or: [
+        { first_name: matchRegex },
+        { last_name: matchRegex },
+        { login_name: matchRegex },
+        { occupation: matchRegex },
+        { location: matchRegex },
+      ],
+    })
+      .select("_id first_name last_name")
+      .exec();
+
+    // Pre-compute photo and comment counts to avoid repeated queries
+    const allPhotos = await Photo.find({}).exec();
+    const photoCounts = {};
+    const commentCounts = {};
+    allPhotos.forEach((photo) => {
+      const ownerId = photo.user_id?.toString();
+      if (ownerId) {
+        photoCounts[ownerId] = (photoCounts[ownerId] || 0) + 1;
+      }
+      (photo.comments || []).forEach((comment) => {
+        const commenterId = comment.user_id?.toString();
+        if (commenterId) {
+          commentCounts[commenterId] = (commentCounts[commenterId] || 0) + 1;
+        }
+      });
+    });
+
+    const usersWithStats = matchedUsers.map((user) => {
+      const id = user._id.toString();
+      return {
+        _id: user._id,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        photo_count: photoCounts[id] || 0,
+        comment_count: commentCounts[id] || 0,
+      };
+    });
+
+    response.status(200).json(usersWithStats);
+  } catch (error) {
+    console.error("Error searching users:", error);
+    response.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // GET /user/:id - Return detailed information of a specific user
 router.get("/:id", requireAuth, async (request, response) => {
   const userId = request.params.id;

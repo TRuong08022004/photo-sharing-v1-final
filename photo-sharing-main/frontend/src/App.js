@@ -16,6 +16,7 @@ import UserList from "./components/UserList";
 import UserPhotos from "./components/UserPhotos";
 import LoginRegister from "./components/LoginRegister";
 import UserComments from "./components/UserComments";
+import SearchResults from "./components/SearchResults";
 
 const App = (props) => {
   const [user, setUser] = useState(null);
@@ -156,6 +157,16 @@ const App = (props) => {
                   element={
                     user ? (
                       <UserComments />
+                    ) : (
+                      <Navigate to="/login-register" replace />
+                    )
+                  }
+                />
+                <Route
+                  path="/search"
+                  element={
+                    user ? (
+                      <SearchResults />
                     ) : (
                       <Navigate to="/login-register" replace />
                     )
